@@ -1,24 +1,56 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>GitHub Repository Watcher</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unstarred</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
-<body>
-    <h1>Watching {{ repos|length }} repos</h1>
-    <ul>
-        {% for repo in repos %}
-            <li>
-                {{ repo.owner }}/{{ repo.repo }}
-                <a href="{% url 'remove_repo' forloop.counter0 %}">Remove</a>
-            </li>
-        {% endfor %}
-    </ul>
+<body class="bg-gray-100">
 
-    <h2>Add a new repository</h2>
-    <form method="POST">
-        {% csrf_token %}
-        <input type="text" name="repo" placeholder="user/repo">
-        <button type="submit">Add Repository</button>
-    </form>
+<div class="container mx-auto py-8">
+    <div class="max-w-xl mx-auto bg-white rounded-lg shadow-md p-6">
+        <h1 class="text-2xl font-semibold text-center text-gray-800 mb-4">Watching {{ repos|length }} Repos</h1>
+
+        <!-- notifications if any -->
+        <div id="notifications-container">
+            {% for notification in notifications %}
+                <div class="p-4 text-white bg-blue-500 rounded-lg mb-2">
+                    {{ notification }}
+                </div>
+            {% endfor %}
+        </div>
+
+        <!-- repositories -->
+        <ul class="divide-y divide-gray-300 mb-6">
+            {% for repo in repos %}
+                <li class="py-3 flex justify-between items-center">
+                    <div class="flex items-center space-x-4">
+                        <span class="font-semibold">{{ repo.owner }}/{{ repo.repo }}</span>
+                        <span class="text-gray-600">{{ repo.stargazer_count }} stars</span>
+                    </div>
+                    <a href="{% url 'remove_repo' forloop.counter0 %}" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded">Remove</a>
+                </li>
+            {% empty %}
+                <li class="py-3 text-center text-gray-500">No repositories being watched.</li>
+            {% endfor %}
+        </ul>
+
+        <!--  add a new repository -->
+        <form method="POST" class="flex items-center space-x-2">
+            {% csrf_token %}
+            <input type="text" name="repo" class="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="user/repo" required>
+            <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md shadow">Add Repo</button>
+        </form>
+
+        <!-- Error message if any -->
+        {% if error %}
+            <div class="mt-4 p-4 bg-red-100 text-red-700 border border-red-200 rounded-md">
+                {{ error }}
+            </div>
+        {% endif %}
+    </div>
+</div>
+
 </body>
 </html>

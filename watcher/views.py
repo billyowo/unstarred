@@ -1,33 +1,21 @@
 import os
 import requests
 from django.shortcuts import render, redirect
-from django.http import JsonResponse
-import json
+from django.contrib import messages
 from threading import Thread
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import time
 
-# Load environment variables for Gmail configuration
 EMAIL_USER = os.getenv("EMAIL_USER")
 EMAIL_PASS = os.getenv("EMAIL_PASS")
 EMAIL_RECEIVER = os.getenv("EMAIL_RECEIVER")
 
 URL = "https://api.github.com/repos/{}/{}/stargazers?per_page=100&page={}"
 
-CONFIG_FILE = "watched_repos.json"
-
-def load_config():
-    """Load repo configurations from file."""
-    if os.path.isfile(CONFIG_FILE):
-        with open(CONFIG_FILE, "r") as f:
-            return json.load(f)
-    return []
-
-def save_config(watched_repos):
-    """Save repo configurations to file."""
-    with open(CONFIG_FILE, "w") as f:
-        json.dump(watched_repos, f)
+CONFIG = []
+notifications = [] 
 
 def fetch_stargazers(username, reponame):
     """Fetch all the stargazers for a repository."""
@@ -72,27 +60,22 @@ def send_email(traitors, username, reponame):
 
 def watch_repositories():
     """Continuously watch for unstargazers every hour."""
-    watched_repos = load_config()
+    global CONFIG, notifications
     while True:
-        for repo in watched_repos:
+        for repo in CONFIG:
             username, reponame = repo['owner'], repo['repo']
             current_stargazers = fetch_stargazers(username, reponame)
 
-            # Load previously saved stargazers for this repo
             prev_users = repo.get('stargazers', [])
             traitors = set(prev_users).difference(current_stargazers)
 
             if traitors:
+                notifications.append(f"Unstargazers detected in {username}/{reponame}: {', '.join(traitors)}. Email will be sent shortly.")
                 send_email(traitors, username, reponame)
 
-            # Update the saved stargazers list
             repo['stargazers'] = current_stargazers
 
-        # Save the updated configurations
-        save_config(watched_repos)
-
-        # Sleep for an hour
-        time.sleep(3600)
+        time.sleep(60)
 
 def start_watching():
     """Start the background thread to watch repositories."""
@@ -100,30 +83,39 @@ def start_watching():
     thread.daemon = True
     thread.start()
 
-# View to handle the listing and adding/removing of repos
 def index(request):
-    watched_repos = load_config()
+    global CONFIG, notifications
+
+    for repo in CONFIG:
+        username, reponame = repo['owner'], repo['repo']
+        repo['stargazer_count'] = len(fetch_stargazers(username, reponame))
+
     if request.method == "POST":
-        # Add a new repository
         repo_input = request.POST.get("repo")
         if repo_input:
             try:
                 owner, repo = repo_input.split('/')
-                watched_repos.append({"owner": owner, "repo": repo, "stargazers": fetch_stargazers(owner, repo)})
-                save_config(watched_repos)
+                data = {"owner": owner, "repo": repo, "stargazers": len(fetch_stargazers(owner, repo))}
+                if data not in CONFIG:
+                    CONFIG.append({"owner": owner, "repo": repo, "stargazers": fetch_stargazers(owner, repo)})
             except ValueError:
-                return JsonResponse({"error": "Invalid input. Please use the format 'user/repo'."})
+                notifications.append("Invalid input. Please use the format 'user/repo'.")
+    
+    context = {
+        "repos": CONFIG,
+        "notifications": notifications, 
+    }
 
-    return render(request, 'index.html', {"repos": watched_repos})
+    notifications = []
 
-# View to remove a repository
+    return render(request, 'index.html', context)
+
+
 def remove_repo(request, index):
-    watched_repos = load_config()
-    del watched_repos[index]
-    save_config(watched_repos)
+    global CONFIG
+    del CONFIG[index]
     return redirect('index')
 
-# URL mapping
 from django.urls import path
 
 urlpatterns = [
