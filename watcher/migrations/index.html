@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>GitHub Repository Watcher</title>
+</head>
+<body>
+    <h1>Watching {{ repos|length }} repos</h1>
+    <ul>
+        {% for repo in repos %}
+            <li>
+                {{ repo.owner }}/{{ repo.repo }}
+                <a href="{% url 'remove_repo' forloop.counter0 %}">Remove</a>
+            </li>
+        {% endfor %}
+    </ul>
+
+    <h2>Add a new repository</h2>
+    <form method="POST">
+        {% csrf_token %}
+        <input type="text" name="repo" placeholder="user/repo">
+        <button type="submit">Add Repository</button>
+    </form>
+</body>
+</html>
